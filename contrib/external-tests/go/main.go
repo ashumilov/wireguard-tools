@@ -10,7 +10,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/titanous/noise"
+	"github.com/flynn/noise"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/crypto/blake2s"
