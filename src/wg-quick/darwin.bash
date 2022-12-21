@@ -39,7 +39,7 @@ die() {
 	exit 1
 }
 
-[[ ${BASH_VERSINFO[0]} -ge 4 ]] || die "Version mismatch: bash ${BASH_VERSINFO[0]} detected, when bash 4+ required"
+[[ ${BASH_VERSINFO[0]} -ge 3 ]] || die "Version mismatch: bash ${BASH_VERSINFO[0]} detected, when bash 3+ required"
 
 CONFIG_SEARCH_PATHS=( /etc/wireguard /usr/local/etc/wireguard )
 
@@ -215,30 +215,30 @@ collect_endpoints() {
 	done < <(wg show "$REAL_INTERFACE" endpoints)
 }
 
-declare -A SERVICE_DNS
-declare -A SERVICE_DNS_SEARCH
-collect_new_service_dns() {
-	local service get_response
-	local -A found_services
-	{ read -r _ && while read -r service; do
-		[[ $service == "*"* ]] && service="${service:1}"
-		found_services["$service"]=1
-		[[ -n ${SERVICE_DNS["$service"]} ]] && continue
-		get_response="$(cmd networksetup -getdnsservers "$service")"
-		[[ $get_response == *" "* ]] && get_response="Empty"
-		[[ -n $get_response ]] && SERVICE_DNS["$service"]="$get_response"
-		get_response="$(cmd networksetup -getsearchdomains "$service")"
-		[[ $get_response == *" "* ]] && get_response="Empty"
-		[[ -n $get_response ]] && SERVICE_DNS_SEARCH["$service"]="$get_response"
-	done; } < <(networksetup -listallnetworkservices)
-
-	for service in "${!SERVICE_DNS[@]}"; do
-		if ! [[ -n ${found_services["$service"]} ]]; then
-			unset SERVICE_DNS["$service"]
-			unset SERVICE_DNS_SEARCH["$service"]
-		fi
-	done
-}
+#declare -A SERVICE_DNS
+#declare -A SERVICE_DNS_SEARCH
+#collect_new_service_dns() {
+#	local service get_response
+#	local -A found_services
+#	{ read -r _ && while read -r service; do
+#		[[ $service == "*"* ]] && service="${service:1}"
+#		found_services["$service"]=1
+#		[[ -n ${SERVICE_DNS["$service"]} ]] && continue
+#		get_response="$(cmd networksetup -getdnsservers "$service")"
+#		[[ $get_response == *" "* ]] && get_response="Empty"
+#		[[ -n $get_response ]] && SERVICE_DNS["$service"]="$get_response"
+#		get_response="$(cmd networksetup -getsearchdomains "$service")"
+#		[[ $get_response == *" "* ]] && get_response="Empty"
+#		[[ -n $get_response ]] && SERVICE_DNS_SEARCH["$service"]="$get_response"
+#	done; } < <(networksetup -listallnetworkservices)
+#
+#	for service in "${!SERVICE_DNS[@]}"; do
+#		if ! [[ -n ${found_services["$service"]} ]]; then
+#			unset SERVICE_DNS["$service"]
+#			unset SERVICE_DNS_SEARCH["$service"]
+#		fi
+#	done
+#}
 
 set_endpoint_direct_route() {
 	local old_endpoints endpoint old_gateway4 old_gateway6 remove_all_old=0 added=( )
@@ -291,22 +291,22 @@ set_endpoint_direct_route() {
 	ENDPOINTS=( "${added[@]}" )
 }
 
-set_dns() {
-	collect_new_service_dns
-	local service response
-	for service in "${!SERVICE_DNS[@]}"; do
-		while read -r response; do
-			[[ $response == *Error* ]] && echo "$response" >&2
-		done < <(
-			cmd networksetup -setdnsservers "$service" "${DNS[@]}"
-			if [[ ${#DNS_SEARCH[@]} -eq 0 ]]; then
-				cmd networksetup -setsearchdomains "$service" Empty
-			else
-				cmd networksetup -setsearchdomains "$service" "${DNS_SEARCH[@]}"
-			fi
-		)
-	done
-}
+#set_dns() {
+#	collect_new_service_dns
+#	local service response
+#	for service in "${!SERVICE_DNS[@]}"; do
+#		while read -r response; do
+#			[[ $response == *Error* ]] && echo "$response" >&2
+#		done < <(
+#			cmd networksetup -setdnsservers "$service" "${DNS[@]}"
+#			if [[ ${#DNS_SEARCH[@]} -eq 0 ]]; then
+#				cmd networksetup -setsearchdomains "$service" Empty
+#			else
+#				cmd networksetup -setsearchdomains "$service" "${DNS_SEARCH[@]}"
+#			fi
+#		)
+#	done
+#}
 
 del_dns() {
 	local service response
@@ -326,7 +326,7 @@ monitor_daemon() {
 	exec >/dev/null 2>&1
 	exec 19< <(exec route -n monitor)
 	local event bpid=$BASHPID mpid=$!
-	[[ ${#DNS[@]} -gt 0 ]] && trap set_dns ALRM
+#	[[ ${#DNS[@]} -gt 0 ]] && trap set_dns ALRM
 	# TODO: this should also check to see if the endpoint actually changes
 	# in response to incoming packets, and then call set_endpoint_direct_route
 	# then too. That function should be able to gracefully cleanup if the
@@ -336,10 +336,10 @@ monitor_daemon() {
 		ifconfig "$REAL_INTERFACE" >/dev/null 2>&1 || break
 		[[ $AUTO_ROUTE4 -eq 1 || $AUTO_ROUTE6 -eq 1 ]] && set_endpoint_direct_route
 		[[ -z $MTU ]] && set_mtu
-		if [[ ${#DNS[@]} -gt 0 ]]; then
-			set_dns
-			sleep 2 && kill -ALRM $bpid 2>/dev/null &
-		fi
+#		if [[ ${#DNS[@]} -gt 0 ]]; then
+#			set_dns
+#			sleep 2 && kill -ALRM $bpid 2>/dev/null &
+#		fi
 	done
 	kill $mpid) &
 	[[ -n $LAUNCHED_BY_LAUNCHD ]] || disown
@@ -464,7 +464,7 @@ cmd_up() {
 		add_route "$i"
 	done
 	[[ $AUTO_ROUTE4 -eq 1 || $AUTO_ROUTE6 -eq 1 ]] && set_endpoint_direct_route
-	[[ ${#DNS[@]} -gt 0 ]] && set_dns
+#	[[ ${#DNS[@]} -gt 0 ]] && set_dns
 	monitor_daemon
 	execute_hooks "${POST_UP[@]}"
 	trap - INT TERM EXIT
